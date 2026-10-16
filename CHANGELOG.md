@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-16
+
 ### Added
 
 - Agent DVR servers (iSpyConnect), reached through their local API at the
@@ -27,3 +29,6 @@ the notes of the version's GitHub Release.
   camera or all of them); dashboard widget "Agent DVR camera"; action "Check
   the connection".
 - Texts and documentation in English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-agentdvr/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-agentdvr/releases/tag/v1.0.0
