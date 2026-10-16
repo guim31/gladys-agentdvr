@@ -1,41 +1,51 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
+// Scene actions (manifest `scene_actions`, Gladys 5.1+).
 //
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
-//
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+// What they add to "Control a device": arming or disarming Agent DVR (the
+// "leaving home" scene), switching EVERY camera on or off at once (privacy
+// at home, surveillance when away), and a manual recording started or
+// stopped on one camera (e.g. when a door opens). The armed state and the
+// "camera on" feature are read only on purpose: these are deliberate
+// choices, never a toggle a voice assistant flips.
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
+export const ARM_COMMANDS = { arm: true, disarm: false };
+export const RECORD_COMMANDS = { start: true, stop: false };
+export const SWITCH_COMMANDS = { on: true, off: false };
 
-const logger = createLogger({ name: 'scenes' });
+function commandOf(table, fields) {
+  const on = table[fields?.command];
+  if (on === undefined) {
+    throw new Error(`Unknown command "${fields?.command}": ${Object.keys(table).join(' or ')}`);
+  }
+  return on;
+}
+
+async function setArmed(hub, { fields }) {
+  await hub.setArmed(commandOf(ARM_COMMANDS, fields));
+}
+
+async function record(hub, { fields }) {
+  const on = commandOf(RECORD_COMMANDS, fields);
+  if (!fields?.camera) {
+    throw new Error('Choose a camera');
+  }
+  await hub.setRecording(hub.require(fields.camera), on);
+}
+
+async function switchCamera(hub, { fields }) {
+  const on = commandOf(SWITCH_COMMANDS, fields);
+  // "Every camera": those added in Gladys; a camera left out of Gladys is not
+  // the user's to change here.
+  const cameras = fields?.camera ? [hub.require(fields.camera)] : hub.createdCameras();
+  if (cameras.length === 0) {
+    throw new Error('No Agent DVR camera added in Gladys');
+  }
+  return { cameras: await hub.setEnabled(cameras, on) };
+}
 
 export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
-  },
+  set_armed: setArmed,
+  record,
+  switch_camera: switchCamera,
 };

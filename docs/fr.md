@@ -1,67 +1,135 @@
-# Template de démonstration
+# Agent DVR
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Amène dans Gladys les caméras d'un serveur [Agent DVR](https://www.ispyconnect.com/) (iSpyConnect,
+gratuit en local) : leur image, le mouvement détecté, l'enregistrement en cours, si elles sont
+activées, et l'état armé du système. Le mouvement et les alertes d'Agent DVR déclenchent des scènes,
+avec l'image du moment, qu'une scène peut vous envoyer. Les scènes peuvent aussi armer ou désarmer
+Agent DVR, lancer un enregistrement et activer ou désactiver les caméras.
 
-## Ce que vous obtenez
+Testée contre un vrai serveur Agent DVR en Docker (7.0) avec des caméras réseau simulées, pas encore
+sur une installation en service avec de vraies caméras : vos retours sont les bienvenus sur
+[GitHub](https://github.com/guim31/gladys-agentdvr/issues) ou sur le forum Gladys.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+## Ce qu'il vous faut
 
-## Configuration
+- Gladys 5.1 ou plus récent.
+- Agent DVR installé sur un ordinateur du réseau local (Windows, Linux, macOS, Docker), joignable
+  depuis Gladys sur son port web (8090 par défaut). Aucun compte iSpyConnect ni abonnement : tout
+  passe par l'API locale d'Agent DVR.
+- Les caméras déjà ajoutées dans Agent DVR.
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+## Installation
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+1. Dans Gladys, ouvrez **Intégrations**, trouvez **Agent DVR** et installez-la.
+2. Dans son onglet **Configuration**, renseignez :
+   - **Adresse d'Agent DVR** : l'adresse de l'ordinateur qui fait tourner Agent DVR, ex.
+     `192.168.1.20`. Sans port, 8090 est utilisé ; ajoutez `:port` s'il a été changé, ou `https://`
+     derrière un proxy inverse.
+   - **Nom d'utilisateur** et **Mot de passe** : seulement si Agent DVR demande une connexion pour
+     son API sur votre réseau (envoyés en HTTP Basic). En général, laissez-les vides.
+   - **Vérification du mouvement** : fréquence de lecture du mouvement, de l'enregistrement, de
+     l'armement et des nouvelles alertes (2, 5, 10 ou 30 secondes, 5 par défaut).
+   - **Rafraîchissement des images** : fréquence d'envoi de l'image de chaque caméra à Gladys (de 10
+     secondes à 15 minutes, 1 minute par défaut). Un mouvement ou une alerte en envoie aussi une
+     aussitôt.
+   - **Langue des noms** : la langue des noms de fonctionnalités donnés à l'ajout d'une caméra.
+3. Enregistrez, puis ouvrez l'onglet **Découverte** : un appareil par caméra, et un appareil
+   **Agent DVR** pour le serveur. Ajoutez ceux que vous voulez.
+4. **Vérifier la connexion** montre ce que lit l'intégration : la version d'Agent DVR, s'il est armé,
+   chaque caméra, si elle reçoit des images et si elle enregistre.
 
-## Actions
+## Les appareils Gladys
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+Chaque caméra d'Agent DVR devient une caméra Gladys, nommée comme dans Agent DVR, avec :
+
+| Fonctionnalité     | Ce que c'est                                                                        |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| **Image**          | L'image de la caméra, envoyée au rythme choisi et aussitôt sur mouvement ou alerte. |
+| **Mouvement**      | 1 tant qu'Agent DVR détecte du mouvement sur la caméra, sinon 0.                    |
+| **Enregistrement** | 1 pendant un enregistrement. Interrupteur : démarre ou arrête un enregistrement.    |
+| **Caméra activée** | 1 quand la caméra est activée dans Agent DVR, 0 quand elle est désactivée.          |
+
+L'appareil **Agent DVR** représente le serveur :
+
+| Fonctionnalité                | Ce que c'est                                           |
+| ----------------------------- | ------------------------------------------------------ |
+| **Armé**                      | 1 quand Agent DVR est armé (alertes actives), sinon 0. |
+| **Caméras en enregistrement** | Le nombre de caméras qui enregistrent en ce moment.    |
+
+**Armé** et **Caméra activée** sont en lecture seule, à dessein : désarmer ou couper une caméra de
+surveillance est un choix délibéré, fait par une action de scène ou le widget, jamais un interrupteur
+qu'un assistant vocal basculerait par erreur. Une caméra activée qui n'envoie plus d'images à
+Agent DVR apparaît injoignable dans Gladys.
+
+## Widget du tableau de bord
+
+**Caméra Agent DVR** montre l'image d'une caméra, le mouvement, l'enregistrement et l'état armé, et
+trois boutons : **Enregistrer** (ou **Arrêter l'enregistrement** ; **Activer la caméra** si elle est
+désactivée), **Désarmer** (ou **Armer**) et **Nouvelle image**.
 
 ## Scènes
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+### Déclencheurs
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+- **Agent DVR : mouvement détecté** : une caméra commence à détecter du mouvement, que le système
+  soit armé ou non. Filtre : la caméra (vide = toutes). Variable : le nom de la caméra. L'image du
+  moment est envoyée à Gladys d'abord.
+- **Agent DVR : alerte** : Agent DVR lève une alerte. Il ne le fait que **armé**, et pour une caméra
+  dont les alertes sont actives : mouvement, détection d'objet par l'IA, commande… Filtre : la caméra.
+  Variables : le nom de la caméra et le message de l'alerte (ex. `Alert`). L'image du moment est
+  envoyée d'abord.
+- **Agent DVR : caméra hors ligne** : une caméra activée n'envoie plus d'images à Agent DVR depuis 30
+  secondes, ou Agent DVR lui-même ne répond plus. Pas déclenché pour une caméra désactivée.
 
-## Tableau de bord
+### Actions
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+- **Agent DVR : armer ou désarmer** : arme le système (les caméras aux alertes actives lèvent des
+  alertes) ou le désarme.
+- **Agent DVR : enregistrer** : **Démarrer** lance un enregistrement sur une caméra, **Arrêter**
+  l'arrête. Refusé sur une caméra désactivée.
+- **Agent DVR : activer ou désactiver une caméra** : active ou désactive une caméra, ou toutes celles
+  ajoutées dans Gladys quand la caméra est laissée vide. Sortie : le nombre de caméras modifiées.
+
+L'action **Envoyer une image de caméra** du cœur envoie la dernière image d'une caméra : juste après
+**Agent DVR : mouvement détecté** ou **Agent DVR : alerte**, c'est l'image de ce moment.
+
+### Idées de scènes
+
+- **Départ** : quand tout le monde est parti, **Agent DVR : armer ou désarmer** sur Armer, et
+  **Agent DVR : activer ou désactiver une caméra** sur Activer pour toutes ; au retour, Désarmer, et
+  Désactiver les caméras intérieures.
+- **Intrusion** : **Agent DVR : alerte** sur la caméra « Jardin » → **Envoyer une image de caméra** de
+  cette caméra sur votre téléphone.
+- **Porte ouverte la nuit** : un détecteur d'ouverture s'ouvre → **Agent DVR : enregistrer**,
+  Démarrer, sur la caméra de l'entrée ; Arrêter deux minutes plus tard.
+- **Caméra perdue** : **Agent DVR : caméra hors ligne** → envoyer un message avec le nom de la caméra.
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« Agent DVR ne répond pas à cette adresse »** : ouvrez `http://<adresse>:8090` dans un
+  navigateur. Vérifiez le port (Paramètres du serveur dans Agent DVR) et qu'aucun pare-feu ne bloque
+  Gladys.
+- **« Quelque chose répond, mais pas comme Agent DVR »** : l'adresse ou le port mène à un autre
+  service. Saisissez l'adresse d'Agent DVR, sans chemin de page.
+- **« Agent DVR refuse l'identifiant ou le mot de passe »** : vérifiez-les, ou laissez-les vides si
+  Agent DVR ne demande rien sur le réseau local.
+- **Pas de déclencheur « alerte »** : Agent DVR doit être armé, et les alertes actives sur la caméra
+  (dans ses réglages, onglet Alertes). **Agent DVR : mouvement détecté** ne dépend pas de l'armement.
+- **Une caméra reste injoignable** : Agent DVR n'en reçoit pas d'images. Vérifiez-la dans Agent DVR.
+- **Plus de détails** : les logs de l'intégration (Intégrations → Agent DVR → Logs) ; mettez
+  `LOG_LEVEL` à `debug` pour voir chaque requête.
+
+## Limites
+
+- Pas de vidéo en direct : Gladys montre des images, envoyées au rythme choisi (Gladys garde 12 images
+  par minute et par caméra au plus). Le flux en direct se regarde dans Agent DVR.
+- Le mouvement est lu toutes les quelques secondes (la vérification du mouvement) : un mouvement très
+  bref entre deux lectures peut passer inaperçu. Les alertes, elles, sont toutes lues.
+- Agent DVR n'a pas d'API d'état en push utilisable sans configuration : l'intégration l'interroge.
+  Avec un intervalle de 2 secondes et beaucoup de caméras, cela fait beaucoup de petites requêtes.
+- Les microphones d'Agent DVR, le PTZ, les profils et les enregistrements passés ne sont pas repris.
+- Un serveur Agent DVR par intégration.
+- Testée avec Agent DVR 7.0 en Docker et des caméras simulées, sans installation réelle : vos retours
+  sont les bienvenus.
+
+Cette intégration n'est pas affiliée à iSpyConnect ni à Agent DVR.

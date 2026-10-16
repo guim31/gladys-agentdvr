@@ -32,15 +32,19 @@ pushing.
 
 ```
 index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
+src/app.js                        every SDK handler, on the real SDK or the tests' fake Gladys
+src/hub.js                        the server, its cameras, timers, states, images, triggers
+src/devices.js                    one Gladys device per camera, one for the server (features, names)
+src/agent/client.js               HTTP client: status, cameras, alerts, commands, images
 src/scenes.js                     scene action handlers (manifest `scene_actions`)
 src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/texts.js                      connection status and "Check the connection" report
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (mandatory)
+test/                             node --test, against the SDK's fake Gladys and a fake Agent DVR
+test/helpers/fakeAgent.js         simulated Agent DVR behind the `fetch` seam
+test/fixtures/agentdvr/           answers recorded from a real Agent DVR 7.0.0.0
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +74,9 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German ("du") and Spanish
+  ("usted"): action messages, manifest texts, widget texts, feature names, and
+  `docs/{en,fr,de,es}.md` with the same sections. `test/i18n.test.js` checks it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +238,41 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Agent DVR : API et pièges (16/10/2026)
+
+Vérifié contre un vrai serveur en Docker : `mirror.gcr.io/doitandbedone/ispyagentdvr:latest` (**Agent DVR
+7.0.0.0**, image non officielle, port 8090 non publié, réseau `gladys-test-agentdvr`). Caméras = conteneur
+`zoneminderhq/zoneminder:latest-ubuntu18.04` lancé en boucle `ffmpeg -re -f lavfi -i testsrc2 … -f mpjpeg -listen 1
+http://0.0.0.0:8081/cam.mjpg` (un client par flux ; `testsrc2` = mouvement permanent, `smptebars` = aucun),
+ajoutées par `command/addCamera?name=…&substream=…`. Référence d'API : https://ispysoftware.github.io/Agent_API/
+(swagger 8.1.1.0) ; `command.cgi?cmd=X` (forme d'agent-py) et `command/X` répondent pareil en 7.0.
+
+- **Erreurs en 200** : un refus revient en HTTP 200 `{ "error": …, "message": … }` (ex. `alert` désarmé :
+  « System is disarmed »). Une commande sur un **oid inconnu répond `{"status":"ok"}`** : vérifier l'id avant.
+  `getObject` d'un oid inconnu : `{"error":"Device not found"}`. `grab.jpg` d'un oid inconnu : 404 ; d'une caméra
+  désactivée : 200 avec une image de remplacement (l'image ne prouve rien).
+- **Commandes appliquées en différé** : `switchOff` et `recordStop` répondent ok mais `getObject` montre l'ancien
+  état pendant ~1 s. Relire jusqu'à voir le changement (`settle`), et **toujours envoyer** la commande (ne pas la
+  sauter sur la foi d'une lecture peut-être périmée : un « off » suivi d'un « on » était perdu).
+- **États** (`getObject.data`) : `online` = caméra **activée** (pas « en ligne ») ; `connected` = des images
+  arrivent ; `detected` = mouvement maintenant ; `alerted` = alerte **non acquittée, collante** (reste vraie
+  longtemps après) : inutilisable comme état, d'où le déclencheur sur `alerts.json`. `function` vaut `Modect`,
+  `Monitor`, `Record`, `None` (désactivée). Une caméra injoignable reste `connecting: true`, `connected: false` ;
+  Agent DVR met ~13 s à voir un flux coupé.
+- **Alertes** : `alerts.json` liste les alertes, plus récentes d'abord, `id` croissant (chaîne), `msg` (`Alert`
+  pour le mouvement, `command` pour `command/alert`). Une alerte n'est levée **qu'armé** et pour une caméra aux
+  alertes actives ; `disarm` ne touche pas `alertsActive` des caméras.
+- **Poids** : `getObjects` fait ~108 Ko (dont 100 Ko d'icônes) : lu une fois par minute ; l'état vif passe par
+  `getObject` (< 1 Ko) par caméra ajoutée. `grab.jpg?size=WxH` redimensionne (y compris vers le haut).
+- **Authentification** : avec `LocalUsername`/`LocalPassword` posés dans `config.json`, la 7.0 répond quand même
+  sans identifiant depuis le LAN (et depuis localhost) : l'en-tête Basic de l'intégration n'a pas pu être prouvé
+  utile. Agent DVR réécrit `config.json` à l'arrêt : le modifier conteneur arrêté (`docker cp`).
+- **Choix de l'intégration (relecture du 16/10)** : panne d'Agent DVR déclarée après 2 listes ratées de suite
+  (`outageAfter`), pas une ; la liste d'une minute ne réécrit pas l'état d'une caméra lue en direct (elle peut
+  précéder une commande pas encore visible) ; si l'alerte la plus récente disparaît, la base repart de la plus
+  récente restante sans rien déclencher ; une caméra rallumée qui ne donne jamais d'images déclenche « hors
+  ligne » ; une lecture lancée avant un changement d'adresse est jetée (`generation`).
+- `getStatus.serverTimeStamp` et `alerts[].time` sont des ticks .NET, non utilisés.
+- Pas de webhook ni de MQTT sans configuration côté Agent DVR, et le conteneur n'a pas de port joignable : tout
+  passe par la lecture périodique.

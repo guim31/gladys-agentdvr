@@ -1,177 +1,671 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Agent DVR",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Agent DVR cameras: images, motion, alerts, recording, arm and disarm, from your own server.",
+    "fr": "Caméras Agent DVR : images, mouvement, alertes, enregistrement, armer et désarmer, en local.",
+    "de": "Agent DVR-Kameras: Bilder, Bewegung, Alarme, Aufnahme, scharf und unscharf, lokal.",
+    "es": "Cámaras de Agent DVR: imágenes, movimiento, alertas, grabación, armar y desarmar, en local."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-agentdvr:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-agentdvr/main/cover.png",
+  "categories": ["security"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Agent DVR server",
+        "fr": "Votre serveur Agent DVR",
+        "de": "Dein Agent DVR-Server",
+        "es": "Su servidor Agent DVR"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Agent DVR by iSpyConnect, free for local use. Enter the address of the computer running it (port 8090 by default). Then open the Discovery tab: one device per camera, and one for the server.",
+        "fr": "Agent DVR d'iSpyConnect, gratuit en local. Saisissez l'adresse de l'ordinateur qui le fait tourner (port 8090 par défaut). Ouvrez ensuite l'onglet Découverte : un appareil par caméra, et un pour le serveur.",
+        "de": "Agent DVR von iSpyConnect, lokal kostenlos. Gib die Adresse des Rechners ein, auf dem es läuft (standardmäßig Port 8090). Öffne dann den Tab „Entdecken“: ein Gerät pro Kamera und eines für den Server.",
+        "es": "Agent DVR de iSpyConnect, gratuito en local. Introduzca la dirección del equipo que lo ejecuta (puerto 8090 por defecto). Luego abra la pestaña Descubrir: un dispositivo por cámara y uno para el servidor."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-agentdvr/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Installationsanleitung",
+            "es": "Guía de instalación"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "url",
+      "type": "string",
+      "label": {
+        "en": "Agent DVR address",
+        "fr": "Adresse d'Agent DVR",
+        "de": "Agent DVR-Adresse",
+        "es": "Dirección de Agent DVR"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "description": {
+        "en": "Without a port, 8090 is used. Add https:// for a reverse proxy.",
+        "fr": "Sans port, 8090 est utilisé. Ajoutez https:// derrière un proxy inverse.",
+        "de": "Ohne Port wird 8090 verwendet. Füge https:// hinter einem Reverse-Proxy hinzu.",
+        "es": "Sin puerto, se usa el 8090. Añada https:// detrás de un proxy inverso."
+      },
+      "placeholder": {
+        "en": "e.g. 192.168.1.20",
+        "fr": "ex. 192.168.1.20",
+        "de": "z. B. 192.168.1.20",
+        "es": "p. ej. 192.168.1.20"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "username",
+      "type": "string",
+      "label": {
+        "en": "User name",
+        "fr": "Nom d'utilisateur",
+        "de": "Benutzername",
+        "es": "Usuario"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "description": {
+        "en": "Only if Agent DVR asks for a login on your network. Usually empty.",
+        "fr": "Seulement si Agent DVR demande une connexion sur votre réseau. Vide en général.",
+        "de": "Nur wenn Agent DVR in deinem Netz eine Anmeldung verlangt. Meist leer.",
+        "es": "Solo si Agent DVR pide inicio de sesión en su red. Normalmente vacío."
+      },
       "required": false,
-      "default": "celsius",
+      "default": ""
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe",
+        "de": "Passwort",
+        "es": "Contraseña"
+      },
+      "required": false
+    },
+    {
+      "key": "poll_interval",
+      "type": "select",
+      "label": {
+        "en": "Motion check",
+        "fr": "Vérification du mouvement",
+        "de": "Bewegungsprüfung",
+        "es": "Comprobación de movimiento"
+      },
+      "description": {
+        "en": "How often motion, recording, the armed state and new alerts are read.",
+        "fr": "Fréquence de lecture du mouvement, de l'enregistrement, de l'armement et des nouvelles alertes.",
+        "de": "Wie oft Bewegung, Aufnahme, Scharfschaltung und neue Alarme gelesen werden.",
+        "es": "Con qué frecuencia se leen el movimiento, la grabación, el armado y las nuevas alertas."
+      },
+      "required": false,
+      "default": "5",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "2",
+          "label": {
+            "en": "2 seconds",
+            "fr": "2 secondes",
+            "de": "2 Sekunden",
+            "es": "2 segundos"
+          }
+        },
+        {
+          "value": "5",
+          "label": {
+            "en": "5 seconds",
+            "fr": "5 secondes",
+            "de": "5 Sekunden",
+            "es": "5 segundos"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "10 seconds",
+            "fr": "10 secondes",
+            "de": "10 Sekunden",
+            "es": "10 segundos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "snapshot_interval",
+      "type": "select",
+      "label": {
+        "en": "Image refresh",
+        "fr": "Rafraîchissement des images",
+        "de": "Bildaktualisierung",
+        "es": "Actualización de imágenes"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "How often each camera image is sent to Gladys. An alarm or a new event also sends one at once.",
+        "fr": "Fréquence d'envoi de l'image de chaque caméra à Gladys. Une alarme ou un nouvel événement en envoie aussi une aussitôt.",
+        "de": "Wie oft das Bild jeder Kamera an Gladys gesendet wird. Ein Alarm oder neues Ereignis sendet sofort eines.",
+        "es": "Con qué frecuencia se envía la imagen de cada cámara a Gladys. Una alarma o un evento nuevo también envía una al instante."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "60",
+      "options": [
+        {
+          "value": "10",
+          "label": {
+            "en": "10 seconds",
+            "fr": "10 secondes",
+            "de": "10 Sekunden",
+            "es": "10 segundos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "30 seconds",
+            "fr": "30 secondes",
+            "de": "30 Sekunden",
+            "es": "30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "300",
+          "label": {
+            "en": "5 minutes",
+            "fr": "5 minutes",
+            "de": "5 Minuten",
+            "es": "5 minutos"
+          }
+        },
+        {
+          "value": "900",
+          "label": {
+            "en": "15 minutes",
+            "fr": "15 minutes",
+            "de": "15 Minuten",
+            "es": "15 minutos"
+          }
+        }
+      ]
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the names",
+        "fr": "Langue des noms",
+        "de": "Sprache der Namen",
+        "es": "Idioma de los nombres"
+      },
+      "description": {
+        "en": "Names given to the features when a camera is added (Motion, Recording…).",
+        "fr": "Noms donnés aux fonctionnalités à l'ajout d'une caméra (Mouvement, Enregistrement…).",
+        "de": "Namen, die den Funktionen beim Hinzufügen einer Kamera gegeben werden (Bewegung, Aufnahme…).",
+        "es": "Nombres dados a las funciones al añadir una cámara (Movimiento, Grabación…)."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "check",
+      "label": {
+        "en": "Check the connection",
+        "fr": "Vérifier la connexion",
+        "de": "Verbindung prüfen",
+        "es": "Comprobar la conexión"
+      },
+      "description": {
+        "en": "Reads Agent DVR again and lists its cameras, whether they receive images and record.",
+        "fr": "Relit Agent DVR et liste ses caméras, si elles reçoivent des images et enregistrent.",
+        "de": "Liest Agent DVR erneut und listet seine Kameras auf, ob sie Bilder empfangen und aufnehmen.",
+        "es": "Vuelve a leer Agent DVR y enumera sus cámaras, si reciben imágenes y graban."
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
       "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "label": {
+        "en": "Agent DVR: motion detected",
+        "fr": "Agent DVR : mouvement détecté",
+        "de": "Agent DVR: Bewegung erkannt",
+        "es": "Agent DVR: movimiento detectado"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A camera starts detecting motion, armed or not, on any camera or the one chosen. The image is sent to Gladys at once.",
+        "fr": "Une caméra commence à détecter du mouvement, armé ou non, sur toutes les caméras ou celle choisie. L’image est envoyée aussitôt à Gladys.",
+        "de": "Eine Kamera beginnt, Bewegung zu erkennen, scharf oder nicht, auf allen Kameras oder der gewählten. Das Bild wird sofort an Gladys gesendet.",
+        "es": "Una cámara empieza a detectar movimiento, armado o no, en todas las cámaras o en la elegida. La imagen se envía al instante a Gladys."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "camera",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every camera.",
+            "fr": "Laisser vide pour toutes les caméras.",
+            "de": "Leer lassen für alle Kameras.",
+            "es": "Déjelo vacío para todas las cámaras."
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "camera_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Camera name",
+            "fr": "Nom de la caméra",
+            "de": "Kameraname",
+            "es": "Nombre de la cámara"
+          }
+        }
+      ]
+    },
+    {
+      "key": "alert",
+      "label": {
+        "en": "Agent DVR: alert",
+        "fr": "Agent DVR : alerte",
+        "de": "Agent DVR: Alarm",
+        "es": "Agent DVR: alerta"
+      },
+      "description": {
+        "en": "Agent DVR raises an alert (system armed, alerts on for the camera): motion, AI detection, a command… The image is sent at once.",
+        "fr": "Agent DVR lève une alerte (système armé, alertes actives sur la caméra) : mouvement, détection IA, commande… L’image est envoyée aussitôt.",
+        "de": "Agent DVR löst einen Alarm aus (System scharf, Alarme für die Kamera an): Bewegung, KI-Erkennung, Befehl… Das Bild wird sofort gesendet.",
+        "es": "Agent DVR genera una alerta (sistema armado, alertas activas en la cámara): movimiento, detección IA, orden… La imagen se envía al instante."
+      },
+      "fields": [
+        {
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every camera.",
+            "fr": "Laisser vide pour toutes les caméras.",
+            "de": "Leer lassen für alle Kameras.",
+            "es": "Déjelo vacío para todas las cámaras."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "camera_name",
+          "type": "string",
+          "label": {
+            "en": "Camera name",
+            "fr": "Nom de la caméra",
+            "de": "Kameraname",
+            "es": "Nombre de la cámara"
+          }
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "label": {
+            "en": "Alert message",
+            "fr": "Message de l'alerte",
+            "de": "Alarmmeldung",
+            "es": "Mensaje de la alerta"
+          }
+        }
+      ]
+    },
+    {
+      "key": "camera_offline",
+      "label": {
+        "en": "Agent DVR: camera offline",
+        "fr": "Agent DVR : caméra hors ligne",
+        "de": "Agent DVR: Kamera offline",
+        "es": "Agent DVR: cámara sin conexión"
+      },
+      "description": {
+        "en": "A camera switched on stops sending images to Agent DVR for 30 seconds, or Agent DVR itself stops answering.",
+        "fr": "Une caméra activée n’envoie plus d’images à Agent DVR depuis 30 secondes, ou Agent DVR lui-même ne répond plus.",
+        "de": "Eine eingeschaltete Kamera sendet seit 30 Sekunden keine Bilder mehr an Agent DVR, oder Agent DVR selbst antwortet nicht mehr.",
+        "es": "Una cámara activada deja de enviar imágenes a Agent DVR durante 30 segundos, o el propio Agent DVR deja de responder."
+      },
+      "fields": [
+        {
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every camera.",
+            "fr": "Laisser vide pour toutes les caméras.",
+            "de": "Leer lassen für alle Kameras.",
+            "es": "Déjelo vacío para todas las cámaras."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "camera_name",
+          "type": "string",
+          "label": {
+            "en": "Camera name",
+            "fr": "Nom de la caméra",
+            "de": "Kameraname",
+            "es": "Nombre de la cámara"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "set_armed",
+      "label": {
+        "en": "Agent DVR: arm or disarm",
+        "fr": "Agent DVR : armer ou désarmer",
+        "de": "Agent DVR: scharf oder unscharf schalten",
+        "es": "Agent DVR: armar o desarmar"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Arms Agent DVR (alerts on, e.g. when everyone leaves) or disarms it.",
+        "fr": "Arme Agent DVR (alertes actives, ex. quand tout le monde part) ou le désarme.",
+        "de": "Schaltet Agent DVR scharf (Alarme an, z. B. wenn alle gehen) oder unscharf.",
+        "es": "Arma Agent DVR (alertas activas, p. ej. cuando todos se van) o lo desarma."
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
+          "key": "command",
+          "type": "select",
+          "label": {
+            "en": "Command",
+            "fr": "Commande",
+            "de": "Befehl",
+            "es": "Orden"
+          },
+          "required": true,
+          "options": [
+            {
+              "value": "arm",
+              "label": {
+                "en": "Arm",
+                "fr": "Armer",
+                "de": "Scharf schalten",
+                "es": "Armar"
+              }
+            },
+            {
+              "value": "disarm",
+              "label": {
+                "en": "Disarm",
+                "fr": "Désarmer",
+                "de": "Unscharf schalten",
+                "es": "Desarmar"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "record",
+      "label": {
+        "en": "Agent DVR: record",
+        "fr": "Agent DVR : enregistrer",
+        "de": "Agent DVR: aufnehmen",
+        "es": "Agent DVR: grabar"
+      },
+      "description": {
+        "en": "Starts a recording on a camera (e.g. when a door opens), or stops it.",
+        "fr": "Démarre un enregistrement sur une caméra (ex. à l’ouverture d’une porte), ou l’arrête.",
+        "de": "Startet eine Aufnahme auf einer Kamera (z. B. wenn eine Tür aufgeht) oder beendet sie.",
+        "es": "Inicia una grabación en una cámara (p. ej. al abrirse una puerta), o la detiene."
+      },
+      "timeout_seconds": 30,
+      "fields": [
+        {
+          "key": "camera",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
           "required": true
+        },
+        {
+          "key": "command",
+          "type": "select",
+          "label": {
+            "en": "Command",
+            "fr": "Commande",
+            "de": "Befehl",
+            "es": "Orden"
+          },
+          "required": true,
+          "options": [
+            {
+              "value": "start",
+              "label": {
+                "en": "Start",
+                "fr": "Démarrer",
+                "de": "Starten",
+                "es": "Iniciar"
+              }
+            },
+            {
+              "value": "stop",
+              "label": {
+                "en": "Stop",
+                "fr": "Arrêter",
+                "de": "Beenden",
+                "es": "Detener"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "switch_camera",
+      "label": {
+        "en": "Agent DVR: switch a camera on or off",
+        "fr": "Agent DVR : activer ou désactiver une caméra",
+        "de": "Agent DVR: Kamera ein- oder ausschalten",
+        "es": "Agent DVR: activar o desactivar una cámara"
+      },
+      "description": {
+        "en": "Switches one camera or all of them on or off in Agent DVR (e.g. off when you are home, for privacy).",
+        "fr": "Active ou désactive une caméra ou toutes dans Agent DVR (ex. désactivées quand vous êtes là, par discrétion).",
+        "de": "Schaltet eine oder alle Kameras in Agent DVR ein oder aus (z. B. aus, wenn du zu Hause bist).",
+        "es": "Activa o desactiva una cámara o todas en Agent DVR (p. ej. desactivadas cuando usted está en casa)."
+      },
+      "timeout_seconds": 60,
+      "fields": [
+        {
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every camera.",
+            "fr": "Laisser vide pour toutes les caméras.",
+            "de": "Leer lassen für alle Kameras.",
+            "es": "Déjelo vacío para todas las cámaras."
+          }
+        },
+        {
+          "key": "command",
+          "type": "select",
+          "label": {
+            "en": "Command",
+            "fr": "Commande",
+            "de": "Befehl",
+            "es": "Orden"
+          },
+          "required": true,
+          "options": [
+            {
+              "value": "on",
+              "label": {
+                "en": "Switch on",
+                "fr": "Activer",
+                "de": "Einschalten",
+                "es": "Activar"
+              }
+            },
+            {
+              "value": "off",
+              "label": {
+                "en": "Switch off",
+                "fr": "Désactiver",
+                "de": "Ausschalten",
+                "es": "Desactivar"
+              }
+            }
+          ]
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "cameras",
+          "type": "number",
+          "label": {
+            "en": "Cameras changed",
+            "fr": "Caméras modifiées",
+            "de": "Geänderte Kameras",
+            "es": "Cámaras modificadas"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "camera",
+      "label": {
+        "en": "Agent DVR camera",
+        "fr": "Caméra Agent DVR",
+        "de": "Agent DVR-Kamera",
+        "es": "Cámara Agent DVR"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The camera image, motion, recording, the armed state, and buttons to record and arm.",
+        "fr": "L'image, le mouvement, l'enregistrement, l'armement, et des boutons pour enregistrer et armer.",
+        "de": "Kamerabild, Bewegung, Aufnahme, Scharfschaltung und Schaltflächen zum Aufnehmen und Scharfschalten.",
+        "es": "La imagen de la cámara, el movimiento, la grabación, el armado y botones para grabar y armar."
+      },
+      "icon": "video",
+      "action_timeout_seconds": 30,
+      "settings": [
+        {
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": true
+        }
+      ]
     }
   ]
 }
