@@ -1,0 +1,135 @@
+# Agent DVR
+
+Bringt die Kameras eines [Agent DVR](https://www.ispyconnect.com/)-Servers (iSpyConnect, lokal
+kostenlos) in Gladys: ihr Bild, erkannte Bewegung, laufende Aufnahme, ob sie eingeschaltet sind, und
+ob das System scharf ist. Bewegung und Alarme von Agent DVR starten Szenen, mit dem Bild des
+Augenblicks, das dir eine Szene schicken kann. Szenen können Agent DVR auch scharf oder unscharf
+schalten, eine Aufnahme starten und Kameras ein- oder ausschalten.
+
+Getestet mit einem echten Agent DVR-Server in Docker (7.0) und simulierten Netzwerkkameras, noch
+nicht mit einer laufenden Installation mit echten Kameras: Rückmeldungen sind willkommen auf
+[GitHub](https://github.com/guim31/gladys-agentdvr/issues) oder im Gladys-Forum.
+
+## Was du brauchst
+
+- Gladys 5.1 oder neuer.
+- Agent DVR auf einem Rechner im lokalen Netz (Windows, Linux, macOS, Docker), von Gladys aus über
+  seinen Webport erreichbar (standardmäßig 8090). Kein iSpyConnect-Konto und kein Abo: Alles läuft
+  über die lokale API von Agent DVR.
+- Die Kameras sind bereits in Agent DVR angelegt.
+
+## Installation
+
+1. Öffne in Gladys **Integrationen**, suche **Agent DVR** und installiere sie.
+2. Fülle im Tab **Konfiguration** aus:
+   - **Agent DVR-Adresse**: die Adresse des Rechners, auf dem Agent DVR läuft, z. B. `192.168.1.20`.
+     Ohne Port wird 8090 verwendet; füge `:Port` hinzu, wenn er geändert wurde, oder `https://`
+     hinter einem Reverse-Proxy.
+   - **Benutzername** und **Passwort**: nur, wenn Agent DVR in deinem Netz eine Anmeldung für seine
+     API verlangt (als HTTP Basic gesendet). Meist bleiben sie leer.
+   - **Bewegungsprüfung**: wie oft Bewegung, Aufnahme, Scharfschaltung und neue Alarme gelesen werden
+     (2, 5, 10 oder 30 Sekunden, standardmäßig 5).
+   - **Bildaktualisierung**: wie oft das Bild jeder Kamera an Gladys gesendet wird (von 10 Sekunden
+     bis 15 Minuten, standardmäßig 1 Minute). Bewegung oder ein Alarm sendet sofort eines.
+   - **Sprache der Namen**: die Sprache der Funktionsnamen beim Hinzufügen einer Kamera.
+3. Speichere und öffne dann den Tab **Entdecken**: ein Gerät pro Kamera und ein Gerät **Agent DVR**
+   für den Server. Füge die gewünschten hinzu.
+4. **Verbindung prüfen** zeigt, was die Integration liest: die Agent DVR-Version, ob es scharf ist,
+   jede Kamera, ob sie Bilder empfängt und aufnimmt.
+
+## Die Gladys-Geräte
+
+Jede Agent DVR-Kamera wird eine Gladys-Kamera, benannt wie in Agent DVR, mit:
+
+| Funktion      | Was es ist                                                                        |
+| ------------- | --------------------------------------------------------------------------------- |
+| **Bild**      | Das Kamerabild, im gewählten Takt gesendet und sofort bei Bewegung oder Alarm.    |
+| **Bewegung**  | 1, solange Agent DVR auf der Kamera Bewegung erkennt, sonst 0.                    |
+| **Aufnahme**  | 1 während einer Aufnahme. Ein Schalter: startet oder beendet eine Aufnahme.       |
+| **Kamera an** | 1, wenn die Kamera in Agent DVR eingeschaltet ist, 0, wenn sie ausgeschaltet ist. |
+
+Das Gerät **Agent DVR** steht für den Server:
+
+| Funktion                | Was es ist                                         |
+| ----------------------- | -------------------------------------------------- |
+| **Scharf**              | 1, wenn Agent DVR scharf ist (Alarme an), sonst 0. |
+| **Aufnehmende Kameras** | Wie viele Kameras gerade aufnehmen.                |
+
+**Scharf** und **Kamera an** sind absichtlich nur lesbar: Unscharf schalten oder eine
+Überwachungskamera ausschalten ist eine bewusste Entscheidung, getroffen über eine Szenenaktion oder
+das Widget, nie ein Schalter, den ein Sprachassistent versehentlich umlegt. Eine eingeschaltete
+Kamera, die Agent DVR keine Bilder mehr sendet, erscheint in Gladys als nicht erreichbar.
+
+## Dashboard-Widget
+
+**Agent DVR-Kamera** zeigt das Bild einer Kamera, Bewegung, Aufnahme und Scharfschaltung, dazu drei
+Schaltflächen: **Aufnehmen** (oder **Aufnahme beenden**; **Kamera einschalten**, wenn sie aus ist),
+**Unscharf schalten** (oder **Scharf schalten**) und **Neues Bild**.
+
+## Szenen
+
+### Auslöser
+
+- **Agent DVR: Bewegung erkannt**: Eine Kamera beginnt, Bewegung zu erkennen, scharf oder nicht.
+  Filter: die Kamera (leer = alle). Variable: der Kameraname. Das Bild des Augenblicks wird zuerst an
+  Gladys gesendet.
+- **Agent DVR: Alarm**: Agent DVR löst einen Alarm aus. Das tut es nur, wenn es **scharf** ist, für
+  eine Kamera mit aktiven Alarmen: Bewegung, KI-Objekterkennung, Befehl… Filter: die Kamera.
+  Variablen: der Kameraname und die Alarmmeldung (z. B. `Alert`). Das Bild des Augenblicks wird
+  zuerst gesendet.
+- **Agent DVR: Kamera offline**: Eine eingeschaltete Kamera sendet seit 30 Sekunden keine Bilder mehr
+  an Agent DVR, oder Agent DVR selbst antwortet nicht mehr. Nicht ausgelöst für eine ausgeschaltete
+  Kamera.
+
+### Aktionen
+
+- **Agent DVR: scharf oder unscharf schalten**: schaltet das System scharf (Kameras mit aktiven
+  Alarmen lösen Alarme aus) oder unscharf.
+- **Agent DVR: aufnehmen**: **Starten** startet eine Aufnahme auf einer Kamera, **Beenden** beendet
+  sie. Abgelehnt für eine ausgeschaltete Kamera.
+- **Agent DVR: Kamera ein- oder ausschalten**: schaltet eine Kamera ein oder aus, oder alle in Gladys
+  hinzugefügten, wenn die Kamera leer bleibt. Ausgabe: wie viele Kameras geändert wurden.
+
+Die Kernaktion **Kamerabild senden** sendet das letzte Bild einer Kamera: direkt nach **Agent DVR:
+Bewegung erkannt** oder **Agent DVR: Alarm** ist es das Bild dieses Augenblicks.
+
+### Szenenideen
+
+- **Verlassen des Hauses**: Wenn alle weg sind, **Agent DVR: scharf oder unscharf schalten** auf
+  Scharf schalten und **Agent DVR: Kamera ein- oder ausschalten** auf Einschalten für alle; bei der
+  Rückkehr Unscharf schalten und die Innenkameras ausschalten.
+- **Einbruch**: **Agent DVR: Alarm** auf der Kamera „Garten“ → **Kamerabild senden** dieser Kamera an
+  dein Handy.
+- **Tür nachts geöffnet**: Ein Öffnungssensor öffnet sich → **Agent DVR: aufnehmen**, Starten, auf der
+  Eingangskamera; Beenden zwei Minuten später.
+- **Kamera verloren**: **Agent DVR: Kamera offline** → eine Nachricht mit dem Kameranamen senden.
+
+## Fehlerbehebung
+
+- **„Agent DVR antwortet unter dieser Adresse nicht“**: Öffne `http://<Adresse>:8090` in einem
+  Browser. Prüfe den Port (Servereinstellungen in Agent DVR) und dass keine Firewall Gladys blockiert.
+- **„Etwas antwortet, aber nicht wie Agent DVR“**: Adresse oder Port führen zu einem anderen Dienst.
+  Gib die Adresse von Agent DVR ohne Seitenpfad ein.
+- **„Agent DVR lehnt Benutzername oder Passwort ab“**: Prüfe sie, oder lass sie leer, wenn Agent DVR
+  im lokalen Netz nichts verlangt.
+- **Kein Auslöser „Alarm“**: Agent DVR muss scharf sein und die Alarme der Kamera aktiv (in ihren
+  Einstellungen, Tab Alerts). **Agent DVR: Bewegung erkannt** hängt nicht von der Scharfschaltung ab.
+- **Eine Kamera bleibt nicht erreichbar**: Agent DVR empfängt keine Bilder von ihr. Prüfe sie in
+  Agent DVR.
+- **Mehr Details**: die Protokolle der Integration (Integrationen → Agent DVR → Protokolle); setze
+  `LOG_LEVEL` auf `debug`, um jede Anfrage zu sehen.
+
+## Grenzen
+
+- Kein Live-Video: Gladys zeigt Bilder, im gewählten Takt gesendet (Gladys behält höchstens 12 Bilder
+  pro Minute und Kamera). Den Live-Stream siehst du in Agent DVR.
+- Bewegung wird alle paar Sekunden gelesen (die Bewegungsprüfung): Eine sehr kurze Bewegung zwischen
+  zwei Abfragen kann unbemerkt bleiben. Die Alarme dagegen werden alle gelesen.
+- Agent DVR hat keine Push-Status-API, die ohne Konfiguration nutzbar wäre: Die Integration fragt es
+  ab. Mit 2 Sekunden und vielen Kameras sind das viele kleine Anfragen.
+- Mikrofone, PTZ, Profile und vergangene Aufnahmen von Agent DVR werden nicht übernommen.
+- Ein Agent DVR-Server pro Integration.
+- Getestet mit Agent DVR 7.0 in Docker und simulierten Kameras, ohne echte Installation:
+  Rückmeldungen sind willkommen.
+
+Diese Integration ist nicht mit iSpyConnect oder Agent DVR verbunden.

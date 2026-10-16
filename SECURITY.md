@@ -30,6 +30,16 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+The integration stores nothing under `/data`. The Agent DVR user name and
+password, when set, are kept by Gladys in the integration configuration; the
+container holds them in memory only, sends them as an HTTP Basic header to the
+Agent DVR address of the configuration, and never writes them in a log line or
+a message. Over plain HTTP they travel in clear text: put Agent DVR behind HTTPS
+if the network between Gladys and Agent DVR is not trusted. Note that Agent DVR
+itself may answer its local API without any login on the local network. The
+integration only talks to that address, on the local network, and opens no
+port.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and Agent DVR and the cameras it records.
