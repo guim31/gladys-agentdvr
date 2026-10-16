@@ -141,7 +141,9 @@ const button = (label, icon, key) => ({
 async function get(hub, { settings, language = 'en' }) {
   const camera = settings?.camera ? hub.resolveDevice(settings.camera) : null;
   if (!camera) {
-    return message(settings?.camera ? TEXT.unknown : TEXT.pick, language);
+    // The server device is in the device list too: not a camera.
+    const unknown = settings?.camera && settings.camera !== hub.serverIds.device;
+    return message(unknown ? TEXT.unknown : TEXT.pick, language);
   }
   if (!camera.image && camera.online !== false && hub.client && hub.server === 'ok') {
     // The first look at this camera: wait a little for an image.
@@ -221,6 +223,10 @@ async function action(hub, { actionKey, settings }) {
   const camera = hub.require(settings.camera);
   switch (actionKey) {
     case ACTIONS.REFRESH:
+      if (!camera.enabled) {
+        // Agent DVR would send a stand-in picture, not the camera's.
+        return { message: TEXT.cameraOff };
+      }
       await hub.grab(camera);
       return {};
     case ACTIONS.RECORD:

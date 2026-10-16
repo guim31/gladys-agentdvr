@@ -57,6 +57,9 @@ export const DEFAULT_TIMINGS = {
   // 12 images a minute per camera at most (the core's bound).
   minImageSpacingMs: 5000,
   heartbeatMs: 12 * 60 * 60 * 1000,
+  // Camera lists failed in a row before Agent DVR is said down (and its
+  // cameras offline): one lost answer, a slow 100 KB list, is not an outage.
+  outageAfter: 2,
   concurrency: 4,
   // Agent DVR answers a command at once but applies it a moment later (seen
   // on 7.0: switchOff and recordStop read back unchanged right after): the
@@ -246,14 +249,25 @@ export class AgentHub {
       status = await this.client.status();
       list = await this.client.listCameras();
     } catch (err) {
-      if (generation === this.generation) {
-        await this.serverFailed(err);
+      if (generation !== this.generation) {
+        return;
       }
+      this.listFailures = (this.listFailures ?? 0) + 1;
+      if (
+        this.server === 'ok' &&
+        err.kind !== 'auth' &&
+        this.listFailures < this.timings.outageAfter
+      ) {
+        logger.debug(`Cannot read the camera list: ${err.message}`);
+        return;
+      }
+      await this.serverFailed(err);
       return;
     }
     if (generation !== this.generation) {
       return;
     }
+    this.listFailures = 0;
     this.applyStatus(status);
     const seen = new Set();
     for (const item of list) {
@@ -262,9 +276,16 @@ export class AgentHub {
       this.cameras.set(item.id, camera);
       this.applyCamera(camera, item, { live: false });
     }
-    for (const id of [...this.cameras.keys()]) {
+    for (const [id, camera] of [...this.cameras]) {
       if (!seen.has(id)) {
         logger.info(`Camera ${id} is no longer in Agent DVR`);
+        // Its device stays in Gladys: no "local" badge nor motion left behind.
+        camera.motion = camera.motion === null ? null : false;
+        await this.publishStates(camera);
+        if (camera.online !== false) {
+          camera.online = false;
+          await this.publishTransports([camera]);
+        }
         this.cameras.delete(id);
       }
     }
@@ -301,11 +322,19 @@ export class AgentHub {
   }
 
   /**
-   * @param {boolean} [options.live] false for the camera list: motion is left
-   * to the reading of each camera, which fires the trigger when it starts.
+   * @param {boolean} [options.live] false for the camera list. A camera added
+   * in Gladys is read on its own every few seconds: the list (read before a
+   * command showed, maybe) only gives its name. Motion is always left to that
+   * reading, which fires the trigger when it starts.
    */
   applyCamera(camera, item, { live = true } = {}) {
     camera.name = item.name;
+    if (!live && camera.liveAt && this.isCreated(camera)) {
+      return;
+    }
+    if (live) {
+      camera.liveAt = Date.now();
+    }
     camera.enabled = item.enabled;
     camera.connected = item.connected;
     if (live || camera.motion === null || !item.enabled) {
@@ -343,7 +372,11 @@ export class AgentHub {
       // Nothing can be read any more: no stale motion, no "local" badge.
       const outage = state === 'unreachable' || state === 'error';
       for (const camera of this.cameras.values()) {
-        camera.motion = camera.motion === null ? null : false;
+        if (camera.motion !== null) {
+          camera.motion = false;
+          // Motion still going on when the server is back is not news.
+          camera.motionUnknown = true;
+        }
         await this.publishStates(camera);
         // Agent DVR down: its cameras are lost too ("Camera offline").
         await this.setOnline(camera, false, { quiet: !outage });
@@ -421,6 +454,9 @@ export class AgentHub {
   }
 
   require(externalId) {
+    if (externalId && externalId === this.serverIds.device) {
+      throw new Error('Choose a camera, not the Agent DVR server');
+    }
     const camera = this.resolveDevice(externalId);
     if (!camera) {
       throw new Error(`Unknown Agent DVR camera ${externalId}: check the integration`);
@@ -600,10 +636,16 @@ export class AgentHub {
 
   async setOnline(camera, online, { quiet = false } = {}) {
     if (camera.online === online) {
+      if (!online && !quiet && camera.quietOffline) {
+        // Switched off, then on again, and no images ever since: that is news.
+        camera.quietOffline = false;
+        this.fireOffline(camera);
+      }
       return;
     }
     const was = camera.online;
     camera.online = online;
+    camera.quietOffline = !online && quiet;
     const name = deviceName(camera, this.config.language);
     if (online && was === false) {
       logger.info(`Camera ${camera.id} (${name}) receives images again`);
@@ -612,11 +654,17 @@ export class AgentHub {
     }
     await this.publishTransports([camera]);
     this.requestWidgetRefresh();
-    if (!online && was === true && !quiet && this.isCreated(camera)) {
+    if (!online && was === true && !quiet) {
+      this.fireOffline(camera);
+    }
+  }
+
+  fireOffline(camera) {
+    if (this.isCreated(camera)) {
       this.track(
         this.gladys.publishSceneEvent(TRIGGERS.OFFLINE, {
           camera: this.ids(camera).device,
-          camera_name: name,
+          camera_name: deviceName(camera, this.config.language),
         }),
       );
     }
@@ -639,8 +687,14 @@ export class AgentHub {
   }
 
   async doPollAll() {
+    // A change of server while reading: what comes back speaks of the old one.
+    const generation = this.generation;
+    const current = () => generation === this.generation;
     try {
       const status = await this.client.status();
+      if (!current()) {
+        return;
+      }
       if (status.armed !== this.armed || status.recording !== this.recordingCount) {
         this.applyStatus(status);
         await this.publishServerStates();
@@ -661,7 +715,13 @@ export class AgentHub {
         cameras.slice(at, at + this.timings.concurrency).map((camera) => this.poll(camera)),
       );
     }
-    await this.checkAlerts();
+    if (!current()) {
+      return;
+    }
+    await this.checkAlerts(generation);
+    if (!current()) {
+      return;
+    }
     for (const camera of cameras) {
       if (
         camera.enabled &&
@@ -686,9 +746,13 @@ export class AgentHub {
     if (!this.client || this.stopped) {
       return;
     }
+    const generation = this.generation;
     let item;
     try {
       item = await this.client.camera(camera.id);
+      if (generation !== this.generation) {
+        return;
+      }
     } catch (err) {
       if (err.kind === 'auth') {
         await this.serverFailed(err);
@@ -698,7 +762,8 @@ export class AgentHub {
       return;
     }
     const before = this.statesKey(camera);
-    const rising = item.enabled && item.motion && camera.motion === false;
+    const rising = item.enabled && item.motion && camera.motion === false && !camera.motionUnknown;
+    camera.motionUnknown = false;
     this.applyCamera(camera, item);
     await this.checkOnline(camera);
     if (this.statesKey(camera) !== before) {
@@ -723,10 +788,13 @@ export class AgentHub {
   }
 
   /** The alerts raised since the last reading: triggers and images. */
-  async checkAlerts() {
+  async checkAlerts(generation = this.generation) {
     let alerts;
     try {
       alerts = await this.client.alerts();
+      if (generation !== this.generation) {
+        return;
+      }
     } catch (err) {
       if (err.kind === 'auth') {
         await this.serverFailed(err);
@@ -737,12 +805,11 @@ export class AgentHub {
     }
     const newest = alerts.reduce((max, alert) => Math.max(max, alert.id), 0);
     if (this.lastAlertId === null || newest < this.lastAlertId) {
-      // The first reading (what happened before is not news), or Agent DVR
-      // started counting again (restarted, alerts cleared).
-      this.lastAlertId = this.lastAlertId === null ? newest : 0;
-      if (this.lastAlertId === newest) {
-        return;
-      }
+      // The first reading (what happened before is not news), or the newest
+      // alert went (deleted, Agent DVR restarted): start again from what is
+      // there now, with nothing to fire.
+      this.lastAlertId = newest;
+      return;
     }
     const fresh = alerts.filter((alert) => alert.id > this.lastAlertId).sort((a, b) => a.id - b.id);
     this.lastAlertId = Math.max(this.lastAlertId, newest);

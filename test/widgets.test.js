@@ -58,7 +58,7 @@ test('the buttons record, disarm, switch a camera back on, bring a new image', a
   assert.equal(ack.success, true, ack.error);
 
   world.server.get(2).data.online = false;
-  await world.hub.refresh();
+  await world.hub.pollAll();
   const content = (await get(world, cameraId(world, 'Garage'))).data.content;
   assert.deepEqual(
     content.components.filter((c) => c.type === 'button').map((button) => button.action.key),

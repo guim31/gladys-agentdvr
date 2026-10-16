@@ -268,6 +268,11 @@ ajoutées par `command/addCamera?name=…&substream=…`. Référence d'API : ht
 - **Authentification** : avec `LocalUsername`/`LocalPassword` posés dans `config.json`, la 7.0 répond quand même
   sans identifiant depuis le LAN (et depuis localhost) : l'en-tête Basic de l'intégration n'a pas pu être prouvé
   utile. Agent DVR réécrit `config.json` à l'arrêt : le modifier conteneur arrêté (`docker cp`).
+- **Choix de l'intégration (relecture du 16/10)** : panne d'Agent DVR déclarée après 2 listes ratées de suite
+  (`outageAfter`), pas une ; la liste d'une minute ne réécrit pas l'état d'une caméra lue en direct (elle peut
+  précéder une commande pas encore visible) ; si l'alerte la plus récente disparaît, la base repart de la plus
+  récente restante sans rien déclencher ; une caméra rallumée qui ne donne jamais d'images déclenche « hors
+  ligne » ; une lecture lancée avant un changement d'adresse est jetée (`generation`).
 - `getStatus.serverTimeStamp` et `alerts[].time` sont des ticks .NET, non utilisés.
 - Pas de webhook ni de MQTT sans configuration côté Agent DVR, et le conteneur n'a pas de port joignable : tout
   passe par la lecture périodique.

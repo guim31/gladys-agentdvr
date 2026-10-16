@@ -19,6 +19,10 @@
 // (no such camera), `refused` (Agent DVR said no), `http` (anything else).
 // -----------------------------------------------------------------------------
 
+import { createLogger } from '@gladysassistant/integration-sdk';
+
+const logger = createLogger({ name: 'agentdvr-api' });
+
 export const REQUEST_TIMEOUT_MS = 15000;
 export const DEFAULT_PORT = 8090;
 export const CAMERA_TYPE = 2;
@@ -152,6 +156,10 @@ export class AgentClient {
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.set(key, String(value));
     }
+    // The path and the command only: never the Authorization header.
+    logger.debug(
+      `GET ${path}${params.cmd ? ` ${params.cmd}` : ''}${params.oid ? ` ${params.oid}` : ''}`,
+    );
     let response;
     try {
       response = await this.fetch(url.href, {

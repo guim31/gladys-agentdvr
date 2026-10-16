@@ -109,7 +109,7 @@ export function checkMessage(summary) {
               : null,
         camera.recording ? text.recording : null,
       ].filter(Boolean);
-      lines.push(`- ${camera.name}: ${flags.join(', ')}`);
+      lines.push(flags.length > 0 ? `- ${camera.name}: ${flags.join(', ')}` : `- ${camera.name}`);
     }
     if (summary.cameras.length > MAX_LISTED) {
       lines.push('…');

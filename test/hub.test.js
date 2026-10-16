@@ -189,7 +189,7 @@ test('scene action: every camera off, then on; only those that change', async (t
   t.after(() => world.app.stop());
   await createAll(world);
   world.server.get(2).data.online = false;
-  await world.hub.refresh();
+  await world.hub.pollAll();
   let ack = await world.fake.sceneAction('switch_camera', { command: 'off' });
   assert.equal(ack.success, true, ack.error);
   assert.deepEqual(ack.data.outputs, { cameras: 2 });
@@ -231,7 +231,7 @@ test('scene action: record on a camera; refused on a camera switched off', async
   assert.equal(ack.success, true, ack.error);
   assert.equal(lastState(world, 3, 'recording'), 1);
   world.server.get(2).data.online = false;
-  await world.hub.refresh();
+  await world.hub.pollAll();
   ack = await world.fake.sceneAction('record', { camera: idOf(world, 2), command: 'start' });
   assert.equal(ack.success, false);
   assert.match(ack.error, /switched off/);
@@ -264,7 +264,10 @@ test('a wrong password, a server down: the connection status', async (t) => {
   await createAll(world);
   world.server.down = true;
   await world.hub.pollAll();
-  assert.deepEqual(events(world, TRIGGERS.OFFLINE), [], 'one lost reading is not an outage');
+  await world.hub.refresh();
+  await world.hub.idle();
+  assert.deepEqual(events(world, TRIGGERS.OFFLINE), [], 'one lost list is not an outage');
+  assert.deepEqual(world.fake.connectionStatus, { connected: true });
   await world.hub.refresh();
   await world.hub.idle();
   assert.match(world.fake.connectionStatus.message.en, /does not answer/);
@@ -311,4 +314,87 @@ test('a reconnection to Gladys sends every state again', async (t) => {
   await world.fake.reconnect?.();
   await world.app.hub.resync(world.hub.config);
   assert.ok(world.fake.states.length > before);
+});
+
+test('the newest alert deleted: the older ones do not fire again', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  await world.hub.pollAll();
+  world.server.alerts.shift();
+  await world.hub.pollAll();
+  await world.hub.idle();
+  assert.deepEqual(events(world, TRIGGERS.ALERT), []);
+  world.server.addAlert(3);
+  await world.hub.pollAll();
+  await world.hub.idle();
+  assert.equal(events(world, TRIGGERS.ALERT).length, 1);
+});
+
+test('a camera switched back on that never sends images fires "camera offline"', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  await world.fake.sceneAction('switch_camera', { camera: idOf(world, 3), command: 'off' });
+  assert.deepEqual(events(world, TRIGGERS.OFFLINE), []);
+  await world.fake.sceneAction('switch_camera', { camera: idOf(world, 3), command: 'on' });
+  world.server.set(3, 'connected', false);
+  await world.hub.pollAll();
+  await world.hub.idle();
+  assert.deepEqual(events(world, TRIGGERS.OFFLINE), [
+    { key: TRIGGERS.OFFLINE, data: { camera: idOf(world, 3), camera_name: 'Porch' } },
+  ]);
+});
+
+test('a list read before a command showed does not bring the old state back', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  const stale = structuredClone(world.server.objects.objectList);
+  await world.fake.sceneAction('record', { camera: idOf(world, 1), command: 'stop' });
+  const states = world.fake.states.length;
+  world.server.objects.objectList = stale;
+  await world.hub.refresh();
+  assert.equal(lastState(world, 1, 'recording'), 0);
+  assert.equal(world.fake.states.length, states);
+});
+
+test('Agent DVR back after an outage: motion still going on is not news', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  await world.hub.pollAll();
+  world.server.down = true;
+  await world.hub.refresh();
+  await world.hub.refresh();
+  world.server.down = false;
+  await world.hub.refresh();
+  await world.hub.pollAll();
+  await world.hub.idle();
+  assert.deepEqual(events(world, TRIGGERS.MOTION), []);
+  assert.equal(lastState(world, 1, 'motion'), 1);
+});
+
+test('a change of server while reading: the old answers are dropped', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  await world.hub.pollAll();
+  world.server.addAlert(3);
+  const reading = world.hub.pollAll();
+  await world.hub.reconfigure({ ...world.hub.config, url: '192.0.2.10:8091' });
+  await reading;
+  await world.hub.idle();
+  assert.deepEqual(events(world, TRIGGERS.ALERT), []);
+});
+
+test('the server device is not a camera for actions and the widget', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  await createAll(world);
+  const server = world.hub.serverIds.device;
+  const ack = await world.fake.sceneAction('record', { camera: server, command: 'start' });
+  assert.match(ack.error, /not the Agent DVR server/);
+  const widget = await world.fake.widgetGet('camera', { settings: { camera: server } });
+  assert.match(widget.data.content.components[0].text, /Choose a camera/);
 });
