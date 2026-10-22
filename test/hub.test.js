@@ -37,7 +37,7 @@ test('adding the devices publishes motion, recording, camera on, armed, images',
   await createAll(world);
   assert.equal(lastState(world, 1, 'motion'), 1);
   assert.equal(lastState(world, 1, 'recording'), 1);
-  assert.equal(lastState(world, 1, 'enabled'), 1);
+  assert.equal(lastState(world, 1, 'camera-on'), 1);
   assert.equal(lastState(world, 3, 'motion'), 0);
   assert.equal(serverState(world, 'armed'), 1);
   assert.equal(serverState(world, 'recording-count'), 1);
@@ -164,7 +164,7 @@ test('the recording switch of the dashboard starts and stops a recording', async
   assert.equal(ack.success, true, ack.error);
   assert.equal(lastState(world, 3, 'recording'), 0);
   // The other features are read only.
-  const enabled = porch.features.find((item) => item.external_id.endsWith(':enabled'));
+  const enabled = porch.features.find((item) => item.external_id.endsWith(':camera-on'));
   assert.equal((await world.fake.setValue(porch, enabled, 0)).success, false);
   assert.equal(world.server.get(3).data.online, true);
 });
@@ -193,13 +193,13 @@ test('scene action: every camera off, then on; only those that change', async (t
   let ack = await world.fake.sceneAction('switch_camera', { command: 'off' });
   assert.equal(ack.success, true, ack.error);
   assert.deepEqual(ack.data.outputs, { cameras: 2 });
-  assert.equal(lastState(world, 1, 'enabled'), 0);
+  assert.equal(lastState(world, 1, 'camera-on'), 0);
   assert.equal(lastState(world, 1, 'motion'), 0);
   // Switched off on purpose: no "Camera offline".
   assert.deepEqual(events(world, TRIGGERS.OFFLINE), []);
   ack = await world.fake.sceneAction('switch_camera', { camera: idOf(world, 1), command: 'on' });
   assert.deepEqual(ack.data.outputs, { cameras: 1 });
-  assert.equal(lastState(world, 1, 'enabled'), 1);
+  assert.equal(lastState(world, 1, 'camera-on'), 1);
 });
 
 test('Agent DVR applies a command a moment later: read again until it shows', async (t) => {
@@ -212,11 +212,11 @@ test('Agent DVR applies a command a moment later: read again until it shows', as
     command: 'off',
   });
   assert.deepEqual(ack.data.outputs, { cameras: 1 });
-  assert.equal(lastState(world, 1, 'enabled'), 0);
+  assert.equal(lastState(world, 1, 'camera-on'), 0);
   // Switched on right after: sent, even if a stale reading said "on".
   ack = await world.fake.sceneAction('switch_camera', { camera: idOf(world, 1), command: 'on' });
   assert.equal(ack.success, true, ack.error);
-  assert.equal(lastState(world, 1, 'enabled'), 1);
+  assert.equal(lastState(world, 1, 'camera-on'), 1);
   assert.equal(world.server.get(1).data.online, true);
   ack = await world.fake.sceneAction('record', { camera: idOf(world, 1), command: 'stop' });
   assert.equal(ack.success, true, ack.error);
@@ -397,4 +397,65 @@ test('the server device is not a camera for actions and the widget', async (t) =
   assert.match(ack.error, /not the Agent DVR server/);
   const widget = await world.fake.widgetGet('camera', { settings: { camera: server } });
   assert.match(widget.data.content.components[0].text, /Choose a camera/);
+});
+
+// Up to 1.0.x "Camera on" was `camera/enabled`, the privacy mode of Gladys 5.2.
+const legacyCamera = (id, { legacy }) => {
+  const device = `ext:test-integration:camera:${id}`;
+  const feature = (key, category, type) => ({
+    external_id: `${device}:${key}`,
+    category,
+    type,
+    read_only: true,
+  });
+  return {
+    name: `Camera ${id}`,
+    external_id: device,
+    params: [{ name: 'AGENTDVR_CAMERA_ID', value: String(id) }],
+    features: [
+      feature('image', 'camera', 'image'),
+      feature('motion', 'motion-sensor', 'binary'),
+      legacy ? feature('enabled', 'camera', 'enabled') : feature('camera-on', 'input', 'binary'),
+    ],
+  };
+};
+
+test('no camera/enabled feature: it is the privacy mode of Gladys 5.2', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  for (const device of world.fake.discoveredDevices) {
+    for (const feature of device.features) {
+      assert.notEqual(`${feature.category}/${feature.type}`, 'camera/enabled', feature.external_id);
+      assert.doesNotMatch(feature.external_id, /:enabled$/, 'the old key is never reused');
+    }
+  }
+  const porch = world.fake.discoveredDevices.find((device) => device.name === 'Porch');
+  const on = porch.features.find((item) => item.external_id.endsWith(':camera-on'));
+  assert.deepEqual([on.category, on.type, on.read_only], ['input', 'binary', true]);
+});
+
+test('a device added in 1.0.x: its old camera/enabled is set to 1 once, then left alone', async (t) => {
+  const world = await createWorld({
+    created: [legacyCamera(1, { legacy: true }), legacyCamera(3, { legacy: false })],
+  });
+  t.after(() => world.app.stop());
+  const old = `${idOf(world, 1)}:enabled`;
+  const writes = (id) => world.fake.states.filter((item) => item.device_feature_external_id === id);
+  assert.deepEqual(
+    writes(old).map((item) => item.state),
+    [1],
+  );
+  // The device without the old feature gets nothing on that key.
+  assert.deepEqual(writes(`${idOf(world, 3)}:enabled`), []);
+  assert.equal(lastState(world, 1, 'camera-on'), 1);
+  // Switched off in Agent DVR, then Gladys comes back: the old feature is never written again.
+  world.server.get(1).data.online = false;
+  await world.hub.pollAll();
+  assert.equal(lastState(world, 1, 'camera-on'), 0);
+  await world.hub.resync(world.hub.config);
+  await world.hub.idle();
+  assert.deepEqual(
+    writes(old).map((item) => item.state),
+    [1],
+  );
 });
