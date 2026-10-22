@@ -63,7 +63,7 @@ a Agent DVR aparece inaccesible en Gladys.
 
 **Cámaras añadidas con la versión 1.0.x**: su antigua funcionalidad **Cámara activada** era del tipo
 Gladys «cámara activada», que Gladys 5.2 usa como modo de privacidad de la cámara (a 0, Gladys
-rechaza sus imágenes). Abra la pestaña Descubrimiento de la integración y haga clic en
+rechaza sus imágenes). Abra la pestaña Descubrir de la integración y haga clic en
 **Actualizar** en cada cámara: la funcionalidad se sustituye por la nueva. Mientras tanto, la
 integración vuelve a poner la antigua a 1 una vez al arrancar, para que las imágenes sigan llegando.
 
