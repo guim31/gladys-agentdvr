@@ -60,6 +60,12 @@ off is a deliberate choice, made by a scene action or the widget, never a switch
 would flip by mistake. A camera switched on that sends no more images to Agent DVR shows as
 unreachable in Gladys.
 
+**Cameras added with version 1.0.x**: their old **Camera on** feature was of the Gladys type
+"camera enabled", which Gladys 5.2 uses as the privacy mode of the camera (at 0, Gladys refuses its
+images). Open the Discovery tab of the integration and click **Update** on each camera: the feature
+is replaced by the new one. Until then, the integration sets the old one to 1 once at startup, so
+the images keep flowing.
+
 ## Dashboard widget
 
 **Agent DVR camera** shows the image of a camera, motion, recording and the armed state, and three

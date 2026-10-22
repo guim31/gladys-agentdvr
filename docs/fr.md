@@ -61,6 +61,12 @@ surveillance est un choix délibéré, fait par une action de scène ou le widge
 qu'un assistant vocal basculerait par erreur. Une caméra activée qui n'envoie plus d'images à
 Agent DVR apparaît injoignable dans Gladys.
 
+**Caméras ajoutées avec la version 1.0.x** : leur ancienne fonctionnalité **Caméra activée** était
+du type Gladys « caméra activée », que Gladys 5.2 utilise comme mode confidentialité de la caméra (à
+0, Gladys refuse ses images). Ouvrez l'onglet Découverte de l'intégration et cliquez sur **Mettre à
+jour** sur chaque caméra : la fonctionnalité est remplacée par la nouvelle. D'ici là, l'intégration
+remet l'ancienne à 1 une fois au démarrage, pour que les images continuent d'arriver.
+
 ## Widget du tableau de bord
 
 **Caméra Agent DVR** montre l'image d'une caméra, le mouvement, l'enregistrement et l'état armé, et

@@ -60,6 +60,12 @@ Das Gerät **Agent DVR** steht für den Server:
 das Widget, nie ein Schalter, den ein Sprachassistent versehentlich umlegt. Eine eingeschaltete
 Kamera, die Agent DVR keine Bilder mehr sendet, erscheint in Gladys als nicht erreichbar.
 
+**Mit Version 1.0.x hinzugefügte Kameras**: Die alte Funktion **Kamera an** hatte den Gladys-Typ
+„Kamera aktiviert", den Gladys 5.2 als Privatsphäre-Modus der Kamera nutzt (bei 0 verweigert Gladys
+ihre Bilder). Öffne den Tab „Entdecken" der Integration und klicke bei jeder Kamera auf
+**Aktualisieren**: Die Funktion wird durch die neue ersetzt. Bis dahin setzt die Integration die
+alte beim Start einmal auf 1, damit die Bilder weiter ankommen.
+
 ## Dashboard-Widget
 
 **Agent DVR-Kamera** zeigt das Bild einer Kamera, Bewegung, Aufnahme und Scharfschaltung, dazu drei

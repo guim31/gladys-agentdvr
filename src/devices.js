@@ -6,10 +6,12 @@
 //   - `motion`: Agent DVR detects motion right now (`motion-sensor/binary`);
 //   - `recording`: the camera records (`switch/binary`), which the dashboard
 //     can start or stop: a manual recording, harmless either way;
-//   - `enabled`: the camera is switched on in Agent DVR (`camera/enabled`),
+//   - `camera-on`: the camera is switched on in Agent DVR (`input/binary`),
 //     read only: turning a surveillance camera off is a deliberate choice,
 //     made by a scene action or the widget, never a toggle a voice assistant
-//     flips.
+//     flips. Never `camera/enabled`: since Gladys 5.2 that is the user's
+//     privacy mode, and at 0 the core refuses the camera's images. Up to
+//     1.0.x it was published under the key `enabled` (LEGACY_ENABLED_KEY).
 // Whether frames come in is the device's transport badge (`local` /
 // `unreachable`) and the "Camera offline" scene trigger, not a feature.
 //
@@ -30,8 +32,12 @@ export const FEATURE_KEYS = {
   IMAGE: 'image',
   MOTION: 'motion',
   RECORDING: 'recording',
-  ENABLED: 'enabled',
+  CAMERA_ON: 'camera-on',
 };
+
+// The `camera/enabled` feature of the 1.0.x devices, still in Gladys until the
+// user clicks "Update" in the Discovery tab. Never reused for anything else.
+export const LEGACY_ENABLED_KEY = 'enabled';
 
 export const SERVER_KEYS = {
   ARMED: 'armed',
@@ -45,7 +51,7 @@ export const NAMES = {
     image: 'Image',
     motion: 'Motion',
     recording: 'Recording',
-    enabled: 'Camera on',
+    camera_on: 'Camera on',
     armed: 'Armed',
     recording_count: 'Cameras recording',
   },
@@ -54,7 +60,7 @@ export const NAMES = {
     image: 'Image',
     motion: 'Mouvement',
     recording: 'Enregistrement',
-    enabled: 'Caméra activée',
+    camera_on: 'Caméra activée',
     armed: 'Armé',
     recording_count: 'Caméras en enregistrement',
   },
@@ -63,7 +69,7 @@ export const NAMES = {
     image: 'Bild',
     motion: 'Bewegung',
     recording: 'Aufnahme',
-    enabled: 'Kamera an',
+    camera_on: 'Kamera an',
     armed: 'Scharf',
     recording_count: 'Aufnehmende Kameras',
   },
@@ -72,7 +78,7 @@ export const NAMES = {
     image: 'Imagen',
     motion: 'Movimiento',
     recording: 'Grabación',
-    enabled: 'Cámara activada',
+    camera_on: 'Cámara activada',
     armed: 'Armado',
     recording_count: 'Cámaras grabando',
   },
@@ -126,10 +132,7 @@ export function featureSpecs(language) {
     },
     binary(FEATURE_KEYS.MOTION, 'motion-sensor', names.motion, true),
     binary(FEATURE_KEYS.RECORDING, 'switch', names.recording, false),
-    {
-      ...binary(FEATURE_KEYS.ENABLED, 'camera', names.enabled, true),
-      type: 'enabled',
-    },
+    binary(FEATURE_KEYS.CAMERA_ON, 'input', names.camera_on, true),
   ];
 }
 

@@ -10,6 +10,16 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Gladys 5.2 refused the camera images after a camera was switched off in
+  Agent DVR: the **Camera on** feature was published as `camera/enabled`, which
+  Gladys 5.2 uses as the privacy mode of the camera. It is now a read-only
+  `input/binary` feature (On/Off) with a new key. For the cameras added with
+  1.0.x, click **Update** in the Discovery tab of the integration to swap the
+  feature; until then, the old one is set to 1 once at startup and never
+  written again.
+
 ## [1.0.0] - 2026-10-16
 
 ### Added

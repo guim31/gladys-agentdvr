@@ -20,6 +20,7 @@ import { createLogger } from '@gladysassistant/integration-sdk';
 import { connectionKey } from './config.js';
 import {
   FEATURE_KEYS,
+  LEGACY_ENABLED_KEY,
   SERVER_KEYS,
   buildDevice,
   buildServerDevice,
@@ -92,6 +93,8 @@ export class AgentHub {
     this.client = null;
     this.clientKey = null;
     this.cameras = new Map();
+    // Legacy `camera/enabled` features already set to 1 (releaseLegacyEnabled).
+    this.legacyReleased = new Set();
     // null (not tried yet), 'ok', 'auth', 'unreachable', 'error', 'noUrl'
     this.server = null;
     this.armed = null;
@@ -112,6 +115,7 @@ export class AgentHub {
         ? `Starting with the Agent DVR server ${this.client.label}`
         : 'No valid Agent DVR address in the configuration',
     );
+    await this.releaseLegacyEnabled();
     await this.refresh();
     this.startTimers();
   }
@@ -124,6 +128,7 @@ export class AgentHub {
     for (const device of this.gladys.devices ?? []) {
       this.gladys.forgetPublishedStates(device.external_id);
     }
+    await this.releaseLegacyEnabled();
     await this.publishAllStates();
     await this.publishTransports();
     if (this.server && this.server !== 'noUrl') {
@@ -475,7 +480,7 @@ export class AgentHub {
     const ids = this.ids(camera);
     const states = [
       {
-        device_feature_external_id: ids.feature(FEATURE_KEYS.ENABLED),
+        device_feature_external_id: ids.feature(FEATURE_KEYS.CAMERA_ON),
         state: camera.enabled ? 1 : 0,
       },
     ];
@@ -530,6 +535,46 @@ export class AgentHub {
         this.statesFailing = true;
         logger.warn(`Cannot publish the states of ${what}: ${err.message}`);
       }
+    }
+  }
+
+  /**
+   * Up to 1.0.x the camera device carried "Camera on" as `camera/enabled`,
+   * which Gladys 5.2 reads as the user's privacy mode: at 0 the core refuses
+   * the camera's images. The feature stays on the devices added before, until
+   * the user clicks "Update" in the Discovery tab: set it to 1 once, so the
+   * images flow, then never write it again (it is the user's switch now).
+   */
+  async releaseLegacyEnabled() {
+    const states = [];
+    for (const device of this.gladys.devices ?? []) {
+      for (const feature of device.features ?? []) {
+        const id = feature?.external_id;
+        if (
+          feature.category === 'camera' &&
+          feature.type === 'enabled' &&
+          featureKeyOf(id) === LEGACY_ENABLED_KEY &&
+          String(id).startsWith(`${device.external_id}:`) &&
+          !this.legacyReleased.has(id)
+        ) {
+          states.push({ device_feature_external_id: id, state: 1 });
+        }
+      }
+    }
+    if (states.length === 0) {
+      return;
+    }
+    try {
+      await this.gladys.publishStates(states);
+      for (const state of states) {
+        this.legacyReleased.add(state.device_feature_external_id);
+      }
+      logger.info(
+        `${states.length} camera(s) still have the old "Camera on" feature: click "Update" in the Discovery tab`,
+      );
+    } catch (err) {
+      // Tried again when Gladys comes back.
+      logger.warn(`Cannot reset the old "Camera on" feature: ${err.message}`);
     }
   }
 
