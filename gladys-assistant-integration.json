@@ -8,8 +8,8 @@
     "de": "Agent DVR-Kameras: Bilder, Bewegung, Alarme, Aufnahme, scharf und unscharf, lokal.",
     "es": "Cámaras de Agent DVR: imágenes, movimiento, alertas, grabación, armar y desarmar, en local."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/guim31/gladys-agentdvr:1.0.0",
+  "version": "1.0.1",
+  "docker_image": "ghcr.io/guim31/gladys-agentdvr:1.0.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/guim31/gladys-agentdvr/main/cover.png",
   "categories": ["security"],
